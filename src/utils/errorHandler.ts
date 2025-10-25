@@ -1,5 +1,5 @@
 import type { Client, CommandInteraction, Interaction, Message, TextChannel } from 'discord.js';
-import { EmbedBuilder } from 'discord.js';
+import { EmbedBuilder, MessageFlags } from 'discord.js';
 
 /**
  * Error severity levels
@@ -31,12 +31,13 @@ export class BotError extends Error {
   public severity: ErrorSeverity;
   public context: ErrorContext;
   public timestamp: Date;
-
+  public trace?: string;
   constructor(
     message: string,
     severity: ErrorSeverity = ErrorSeverity.MEDIUM,
     context: ErrorContext = {},
-    cause?: Error
+    cause?: Error,
+    trace?: string
   ) {
     super(message);
     this.name = 'BotError';
@@ -44,6 +45,7 @@ export class BotError extends Error {
     this.context = context;
     this.timestamp = new Date();
     this.cause = cause;
+    this.trace = trace;
   }
 }
 
@@ -80,7 +82,7 @@ export class ErrorHandler {
     const botError =
       error instanceof BotError
         ? error
-        : new BotError(error.message, ErrorSeverity.MEDIUM, context || {}, error);
+        : new BotError(error.message, ErrorSeverity.MEDIUM, context || {}, error, error.stack);
 
     // Log the error
     this.logError(botError);
@@ -175,6 +177,11 @@ export class ErrorHandler {
    */
   private async sendErrorResponse(interaction: CommandInteraction, error: BotError): Promise<void> {
     try {
+      const truncate = (text: string, max = 1000): string => {
+        if (!text) return '';
+        return text.length > max ? `${text.slice(0, max - 3)}...` : text;
+      };
+
       const embed = new EmbedBuilder()
         .setTitle('❌ Error Occurred')
         .setColor('#ff0000')
@@ -188,12 +195,24 @@ export class ErrorHandler {
       // Add more details for development
       if (process.env.NODE_ENV === 'development') {
         embed.addFields(
-          { name: 'Message', value: error.message, inline: false },
-          { name: 'Command', value: error.context.command || 'Unknown', inline: true }
+          { name: 'Message', value: truncate(error.message), inline: false },
+          {
+            name: 'Command',
+            value: error.context.command || 'Unknown',
+            inline: true,
+          },
+          {
+            name: 'Stack',
+            value: truncate(error.stack || 'No stack trace'),
+            inline: false,
+          }
         );
       }
 
-      await interaction.reply({ embeds: [embed], ephemeral: true });
+      await interaction.reply({
+        embeds: [embed],
+        flags: MessageFlags.Ephemeral,
+      });
     } catch (replyError) {
       console.error('Failed to send error response:', replyError);
     }

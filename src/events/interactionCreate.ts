@@ -17,7 +17,6 @@ export class InteractionCreate {
 
       await bot.executeInteraction(interaction);
     } catch (error) {
-      console.log(error);
       await errorHandler.handleError(error as Error, interaction as CommandInteraction, {
         command: 'interaction',
         userId: interaction.user?.id,

@@ -112,5 +112,4 @@ export function parseDuration(duration: string): number {
       return value * 24 * 60 * 60 * 1000;
   }
 
-  throw new Error('Invalid duration format');
 }
